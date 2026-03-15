@@ -2,6 +2,19 @@
  * analyze.js
  * ----------
  * Uses Claude to evaluate an enriched government contract opportunity.
+ *
+ * Given structured metadata (from SAM.gov) + full solicitation text
+ * (from Cloudflare /crawl), Claude returns a structured analysis:
+ *
+ *   score          — 1–10 profitability / win-probability score
+ *   goNoGo         — 'GO' | 'NO-GO' | 'MAYBE'
+ *   summary        — 2–3 sentence plain-English brief
+ *   estimatedValue — extracted $ figure if available
+ *   deadline       — response deadline
+ *   winFactors     — what's in your favour
+ *   risks          — what could hurt you
+ *   proposalOutline — ordered list of sections to write
+ *   keyRequirements — must-have qualifications or certifications
  */
 
 import { config } from './config.js';
@@ -12,8 +25,6 @@ export async function analyzeOpportunity(opp) {
   if (!config.ANTHROPIC_API_KEY) {
     return getMockAnalysis(opp);
   }
-
-  const prompt = buildPrompt(opp);
 
   const res = await fetch(CLAUDE_API, {
     method:  'POST',
@@ -26,7 +37,7 @@ export async function analyzeOpportunity(opp) {
       model:      'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system:     SYSTEM_PROMPT,
-      messages:   [{ role: 'user', content: prompt }],
+      messages:   [{ role: 'user', content: buildPrompt(opp) }],
     }),
   });
 
@@ -38,6 +49,8 @@ export async function analyzeOpportunity(opp) {
   const text = data.content?.[0]?.text ?? '';
   return parseAnalysis(text, opp);
 }
+
+// ─── Prompts ──────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `
 You are a senior government contracting strategist with 20 years of experience
@@ -52,27 +65,28 @@ function buildPrompt(opp) {
 Analyze this government contract opportunity and return a JSON object with this exact shape:
 
 {
-  "score":          <integer 1-10, where 10 = highly profitable, very winnable>,
-  "goNoGo":         <"GO" | "NO-GO" | "MAYBE">,
-  "summary":        <2-3 sentence plain-English brief>,
-  "estimatedValue": <extracted dollar amount as a string, e.g. "$2.4M", or null>,
-  "deadline":       <response deadline as a plain date string, or null>,
-  "winFactors":     <array of 3 strings>,
-  "risks":          <array of 3 strings>,
-  "proposalOutline":<array of 5-7 section titles for the proposal>,
-  "keyRequirements":<array of must-have qualifications or certifications>
+  "score":           <integer 1-10, where 10 = highly profitable and very winnable>,
+  "goNoGo":          <"GO" | "NO-GO" | "MAYBE">,
+  "summary":         <2-3 sentence plain-English brief>,
+  "estimatedValue":  <extracted dollar amount as a string e.g. "$2.4M", or null>,
+  "deadline":        <response deadline as a plain date string, or null>,
+  "winFactors":      <array of 3 strings — reasons this is winnable>,
+  "risks":           <array of 3 strings — reasons this could be lost>,
+  "proposalOutline": <array of 5-7 section titles for the proposal>,
+  "keyRequirements": <array of must-have qualifications or certifications>
 }
 
 Return ONLY the JSON object. No explanation, no markdown fences.
 
 ---
 
-Title:       ${opp.title}
-Agency:      ${opp.agency} / ${opp.subAgency}
-NAICS:       ${opp.naicsCode}
-Set-aside:   ${opp.setAside}
-Posted:      ${opp.postedDate}
-Deadline:    ${opp.responseDeadline || 'Not specified'}
+Title:        ${opp.title}
+Agency:       ${opp.agency} / ${opp.subAgency}
+NAICS:        ${opp.naicsCode}
+Set-aside:    ${opp.setAside}
+Posted:       ${opp.postedDate}
+Deadline:     ${opp.responseDeadline || 'Not specified'}
+Solicitation: ${opp.solicitationNum}
 
 ---
 
@@ -80,12 +94,14 @@ ${opp.pageText.slice(0, 6000)}
 `.trim();
 }
 
+// ─── Response parsing ─────────────────────────────────────────────────────────
+
 function parseAnalysis(text, opp) {
   try {
     const clean = text.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
   } catch {
-    console.warn(`  Could not parse Claude response for "${opp.title}" — using fallback.`);
+    console.warn(`  ⚠  Could not parse Claude response for "${opp.title}" — using fallback.`);
     return {
       score: 5, goNoGo: 'MAYBE', summary: text.slice(0, 200),
       estimatedValue: null, deadline: opp.responseDeadline,
@@ -94,6 +110,8 @@ function parseAnalysis(text, opp) {
     };
   }
 }
+
+// ─── Demo mode (no API key) ───────────────────────────────────────────────────
 
 function getMockAnalysis(opp) {
   const mockData = {
@@ -111,7 +129,7 @@ function getMockAnalysis(opp) {
       risks: [
         'Secret clearance for 2 key personnel may be hard to staff quickly',
         'CMMC Level 2 certification requires a third-party assessment',
-        'Compressed timeline if you are starting clearance process now',
+        'Compressed timeline if you are starting the clearance process now',
       ],
       proposalOutline: [
         'Executive Summary — Mission alignment and differentiators',
@@ -134,9 +152,9 @@ function getMockAnalysis(opp) {
       estimatedValue: null,
       deadline: '2026-04-01',
       winFactors: [
-        '8(a) set-aside gives GSA Schedule holders preferred access',
+        '8(a) set-aside gives certified firms preferred access',
         'Data analytics is a strength area if your team has AFRL experience',
-        'Phase II implies the government is happy to fund further work',
+        'Phase II implies the government is satisfied and ready to fund further work',
       ],
       risks: [
         'Phase I incumbent almost certainly has an enormous advantage',
@@ -170,14 +188,14 @@ function getMockAnalysis(opp) {
       risks: [
         'Response deadline is March 28 — very tight turnaround',
         'Estimated value not published — blind pricing is risky',
-        'Strong incumbents in GSA cybersecurity space (Booz Allen, Leidos)',
+        'Strong incumbents in the GSA cybersecurity space (Booz Allen, Leidos)',
       ],
       proposalOutline: [
         'Executive Summary — Zero-trust alignment with EO 14028',
         'Technical Approach — Assessment methodology and ZTA roadmap',
         'Implementation Plan — Phased rollout and milestones',
         'Key Personnel — Credentials and certifications (CISSP, CISM)',
-        'Past Performance — Prior agency cybersecurity assessments',
+        'Past Performance — Prior federal cybersecurity assessments',
         'Price — Labor mix and T&M or FFP recommendation',
       ],
       keyRequirements: [
@@ -189,9 +207,11 @@ function getMockAnalysis(opp) {
   };
 
   return mockData[opp.id] ?? {
-    score: 5, goNoGo: 'MAYBE',
+    score: 5,
+    goNoGo: 'MAYBE',
     summary: 'Analysis not available for this opportunity in demo mode.',
-    estimatedValue: null, deadline: opp.responseDeadline,
+    estimatedValue: null,
+    deadline: opp.responseDeadline,
     winFactors: ['Set-aside may limit competition'],
     risks: ['Incumbent advantage unknown', 'Value unclear'],
     proposalOutline: ['Executive Summary', 'Technical Approach', 'Past Performance', 'Pricing'],

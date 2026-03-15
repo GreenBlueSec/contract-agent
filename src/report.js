@@ -1,14 +1,14 @@
 /**
  * report.js
  * ---------
- * Formats the analyzed opportunities into a readable CLI report.
+ * Formats analyzed opportunities into a readable CLI report.
  * Designed to be skimmable in 30 seconds and actionable immediately.
  */
 
-const GO_COLORS = {
-  'GO':     '✅ GO',
-  'NO-GO':  '❌ NO-GO',
-  'MAYBE':  '🟡 MAYBE',
+const DECISION_LABEL = {
+  'GO':    '✅ GO',
+  'NO-GO': '❌ NO-GO',
+  'MAYBE': '🟡 MAYBE',
 };
 
 /**
@@ -19,13 +19,13 @@ export function formatReport(analyzed) {
   const lines = [];
 
   lines.push('═'.repeat(64));
-  lines.push('  GOVCON AI AGENT  —  Opportunity Report');
+  lines.push('  SAM Contract Agent  —  Opportunity Report');
   lines.push(`  Generated: ${new Date().toLocaleString()}`);
   lines.push('═'.repeat(64));
 
   analyzed.forEach((opp, i) => {
-    const a = opp.analysis;
-    const rank = i + 1;
+    const a        = opp.analysis;
+    const rank     = i + 1;
     const scoreBar = '█'.repeat(a.score) + '░'.repeat(10 - a.score);
 
     lines.push('');
@@ -33,7 +33,7 @@ export function formatReport(analyzed) {
     lines.push(`  ${opp.agency}`);
     lines.push('  ' + '─'.repeat(60));
 
-    lines.push(`  Decision:   ${GO_COLORS[a.goNoGo] ?? a.goNoGo}`);
+    lines.push(`  Decision:   ${DECISION_LABEL[a.goNoGo] ?? a.goNoGo}`);
     lines.push(`  Score:      ${scoreBar}  ${a.score}/10`);
     lines.push(`  Value:      ${a.estimatedValue ?? 'Not specified'}`);
     lines.push(`  Deadline:   ${a.deadline ?? opp.responseDeadline ?? 'TBD'}`);
@@ -42,32 +42,32 @@ export function formatReport(analyzed) {
     lines.push(`  Link:       ${opp.uiLink}`);
     lines.push('');
 
-    lines.push(`  Summary`);
+    lines.push('  Summary');
     lines.push(wrapText(a.summary, 58, '    '));
     lines.push('');
 
     if (a.keyRequirements?.length) {
-      lines.push(`  Key requirements`);
+      lines.push('  Key requirements');
       a.keyRequirements.forEach((r) => lines.push(`    • ${r}`));
       lines.push('');
     }
 
-    lines.push(`  Win factors`);
+    lines.push('  Win factors');
     (a.winFactors ?? []).forEach((f) => lines.push(`    ✓ ${f}`));
     lines.push('');
 
-    lines.push(`  Risks`);
+    lines.push('  Risks');
     (a.risks ?? []).forEach((r) => lines.push(`    ✗ ${r}`));
     lines.push('');
 
     if (a.goNoGo === 'GO' || a.goNoGo === 'MAYBE') {
-      lines.push(`  Proposal outline`);
+      lines.push('  Proposal outline');
       (a.proposalOutline ?? []).forEach((s, j) =>
         lines.push(`    ${j + 1}. ${s}`)
       );
+      lines.push('');
     }
 
-    lines.push('');
     lines.push('  ' + '─'.repeat(60));
   });
 

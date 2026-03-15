@@ -1,6 +1,6 @@
 /**
- * GovCon AI Agent
- * ---------------
+ * SAM Contract Agent
+ * ------------------
  * Finds profitable government contract opportunities on SAM.gov,
  * enriches them via the Cloudflare /crawl endpoint, and uses
  * Claude to score, rank, and produce actionable briefs.
@@ -31,7 +31,7 @@ const SEARCH = {
 
 async function run() {
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║       GovCon AI Agent  —  Pipeline start     ║');
+  console.log('║         SAM Contract Agent  —  Starting      ║');
   console.log('╚══════════════════════════════════════════════╝\n');
 
   // Step 1 — Pull structured opportunity metadata from SAM.gov

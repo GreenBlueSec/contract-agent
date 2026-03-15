@@ -5,12 +5,12 @@
  * Docs: https://developers.cloudflare.com/browser-rendering/rest-api/crawl-endpoint/
  *
  * Workflow (async job pattern):
- *   POST /crawl  → { jobId }
- *   GET  /crawl/:jobId  → poll until status !== 'running'
+ *   POST /crawl        → { jobId }
+ *   GET  /crawl/:jobId → poll until status !== 'running'
  *
  * Notes:
- *   - SAM.gov opportunity pages are JavaScript-rendered SPAs — render:true is required.
- *   - We set limit:1 because we only need the single detail page, not the whole site.
+ *   - SAM.gov opportunity pages are JavaScript-rendered SPAs — render: true is required.
+ *   - We set limit: 1 because we only need the single detail page, not the whole site.
  *   - Results are cached for 14 days by Cloudflare, so re-crawling the same URL is cheap.
  */
 
@@ -37,42 +37,35 @@ export async function crawlOpportunityPage(url) {
     return getMockPageText(url);
   }
 
-  // 1. Submit the crawl job
-  const jobId = await submitCrawl(url);
-
-  // 2. Poll until complete
+  const jobId  = await submitCrawl(url);
   const result = await pollForResult(jobId);
+  const page   = result.pages?.[0];
 
-  // 3. Extract text from the first (and only) crawled page
-  const page = result.pages?.[0];
   if (!page) throw new Error(`No pages returned for crawl job ${jobId}`);
 
-  // Prefer markdown; fall back to a snippet of HTML
   return page.markdown ?? page.text ?? page.content ?? '';
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function submitCrawl(url) {
-  const body = {
-    url,
-    format:         'markdown',   // returns clean markdown — ideal for LLM consumption
-    render:         true,         // SAM.gov pages require JS execution
-    limit:          1,            // we only need this one page, no link-following
-    rejectResourceTypes: ['image', 'media', 'font'],  // skip non-content resources
-  };
-
   const res = await fetch(`${CF_BASE}/crawl`, {
     method:  'POST',
     headers: HEADERS,
-    body:    JSON.stringify(body),
+    body: JSON.stringify({
+      url,
+      format:              'markdown',   // clean markdown — ideal for LLM consumption
+      render:              true,         // SAM.gov pages require JS execution
+      limit:               1,            // single page, no link-following
+      rejectResourceTypes: ['image', 'media', 'font'],
+    }),
   });
 
   if (!res.ok) {
     throw new Error(`Cloudflare crawl submit failed ${res.status}: ${await res.text()}`);
   }
 
-  const data = await res.json();
+  const data  = await res.json();
   const jobId = data.result?.id ?? data.id;
 
   if (!jobId) throw new Error('Cloudflare API returned no job ID');
@@ -86,7 +79,7 @@ async function pollForResult(jobId) {
     const res = await fetch(`${CF_BASE}/crawl/${jobId}`, { headers: HEADERS });
     if (!res.ok) throw new Error(`Cloudflare poll failed ${res.status}`);
 
-    const data = await res.json();
+    const data   = await res.json();
     const result = data.result ?? data;
 
     if (result.status === 'running') continue;
@@ -94,23 +87,21 @@ async function pollForResult(jobId) {
     if (result.status === 'cancelled_due_to_limits') {
       throw new Error('Cloudflare crawl hit account limits. Check your Workers plan.');
     }
-
     if (result.status === 'cancelled_due_to_timeout') {
-      throw new Error('Cloudflare crawl timed out (> 7 days). Something went wrong.');
+      throw new Error('Cloudflare crawl timed out. Something went wrong.');
     }
 
-    // 'complete' or any non-running, non-error status — return what we have
     return result;
   }
 
-  throw new Error(`Cloudflare crawl ${jobId} did not complete within ${MAX_POLLS * POLL_INTERVAL_MS / 1000}s`);
+  throw new Error(`Crawl job ${jobId} did not complete within ${MAX_POLLS * POLL_INTERVAL_MS / 1000}s`);
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ─── Mock page text (used when no Cloudflare credentials are set) ─────────────
+// ─── Demo mode (no Cloudflare credentials) ───────────────────────────────────
 
 function getMockPageText(url) {
   const id = url.split('/').at(-2) ?? 'MOCK';

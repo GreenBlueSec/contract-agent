@@ -5,15 +5,14 @@
  * Values are read from environment variables (or a .env file).
  *
  * Required to run with real data:
- *   SAM_API_KEY      — from sam.gov/profile/details  (free)
- *   CF_ACCOUNT_ID    — from Cloudflare dashboard > right sidebar
- *   CF_API_TOKEN     — Cloudflare API token with Browser Rendering Edit permission
- *   ANTHROPIC_API_KEY — from console.anthropic.com  (already set in this environment)
+ *   SAM_API_KEY       — from sam.gov/profile/details  (free)
+ *   CF_ACCOUNT_ID     — from Cloudflare dashboard → right sidebar
+ *   CF_API_TOKEN      — Cloudflare API token with Browser Rendering: Edit permission
+ *   ANTHROPIC_API_KEY — from console.anthropic.com
  *
- * The agent runs in mock/demo mode if any of these are absent.
+ * The agent runs in demo mode if any of these are absent.
  */
 
-// Load .env if present (won't error if file doesn't exist)
 try {
   const { config: loadDotenv } = await import('dotenv');
   loadDotenv();

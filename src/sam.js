@@ -6,7 +6,7 @@
  *
  * Rate limits:
  *   Public (no account): 10 req/day
- *   Registered user:   1 000 req/day  ← get a free key at sam.gov/profile/details
+ *   Registered user:     1,000 req/day  ← get a free key at sam.gov/profile/details
  */
 
 import { config } from './config.js';
@@ -19,8 +19,8 @@ const BASE_URL = 'https://api.sam.gov/prod/opportunities/v2/search';
 function samDate(daysAgo = 0) {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${mm}/${dd}/${yyyy}`;
 }
@@ -32,7 +32,7 @@ function samDate(daysAgo = 0) {
  * @param {string}  opts.keywords       - Full-text search string
  * @param {string}  [opts.naicsCode]    - 6-digit NAICS code filter
  * @param {number}  [opts.postedWithin] - Only return opps posted in last N days
- * @param {number}  [opts.maxResults]   - Max records to return (SAM.gov max: 1000)
+ * @param {number}  [opts.maxResults]   - Max records to return (SAM.gov cap: 1,000)
  * @returns {Promise<OpportunityMetadata[]>}
  */
 export async function fetchOpportunities(opts = {}) {
@@ -44,15 +44,15 @@ export async function fetchOpportunities(opts = {}) {
   } = opts;
 
   if (!config.SAM_API_KEY) {
-    console.warn('  ⚠  SAM_API_KEY not set — using mock data for demonstration.\n');
-    return getMockOpportunities();
+    console.warn('  ⚠  SAM_API_KEY not set — using demo data.\n');
+    return getDemoOpportunities();
   }
 
   const params = new URLSearchParams({
     api_key:    config.SAM_API_KEY,
     limit:      String(Math.min(maxResults, 100)),
     offset:     '0',
-    ptype:      'o',                     // solicitations only
+    ptype:      'o',          // solicitations only
     status:     'active',
     postedFrom: samDate(postedWithin),
     postedTo:   samDate(0),
@@ -60,8 +60,7 @@ export async function fetchOpportunities(opts = {}) {
     ...(naicsCode && { naicsCode }),
   });
 
-  const url = `${BASE_URL}?${params}`;
-  const res = await fetch(url);
+  const res = await fetch(`${BASE_URL}?${params}`);
 
   if (!res.ok) {
     throw new Error(`SAM.gov API error ${res.status}: ${await res.text()}`);
@@ -74,7 +73,7 @@ export async function fetchOpportunities(opts = {}) {
 }
 
 /**
- * Normalize raw SAM.gov record into a clean shape our agent uses.
+ * Normalize a raw SAM.gov record into the shape the agent uses internally.
  */
 function normalizeOpportunity(raw) {
   return {
@@ -95,9 +94,9 @@ function normalizeOpportunity(raw) {
   };
 }
 
-// ─── Mock data (used when no API key is set) ──────────────────────────────────
+// ─── Demo mode (no API key) ───────────────────────────────────────────────────
 
-function getMockOpportunities() {
+function getDemoOpportunities() {
   return [
     {
       id:               'MOCK-001',
